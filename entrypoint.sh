@@ -1,11 +1,17 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 
 # This script runs as ROOT. It configures permissions, then drops to 'coder' user via gosu.
 
 SOCKET="/var/run/docker.sock"
-TARGET_UID=${PUID:-1000}
-TARGET_GID=${PGID:-1000}
+TARGET_UID="${PUID:-1000}"
+TARGET_GID="${PGID:-1000}"
+TZ="${TZ:-}"
+
+if ! [[ "$TARGET_UID" =~ ^[0-9]+$ && "$TARGET_GID" =~ ^[0-9]+$ ]]; then
+    echo "[Error] PUID and PGID must be numeric (got PUID='$TARGET_UID', PGID='$TARGET_GID')"
+    exit 1
+fi
 
 echo "========================================"
 echo "Antigravity Server - Initializing..."
@@ -53,21 +59,30 @@ fi
 # --- 2. Docker Socket Access ---
 if [ -S "$SOCKET" ]; then
     SOCKET_GID=$(stat -c '%g' "$SOCKET")
-    
-    if getent group docker > /dev/null 2>&1; then
-        CURRENT_DOCKER_GID=$(getent group docker | cut -d: -f3)
-        if [ "$CURRENT_DOCKER_GID" != "$SOCKET_GID" ]; then
-            echo "[Setup] Syncing 'docker' group GID to $SOCKET_GID"
-            groupmod -o -g "$SOCKET_GID" docker
-        fi
+
+    # Prefer using an existing group that already owns the socket GID; avoid mutating group IDs
+    # inside the container (which can fail when the GID is already taken).
+    SOCKET_GROUP_NAME="$(getent group | awk -F: -v gid="$SOCKET_GID" '$3==gid { print $1; exit }')"
+    if [ -n "$SOCKET_GROUP_NAME" ]; then
+        DOCKER_ACCESS_GROUP="$SOCKET_GROUP_NAME"
     else
-        echo "[Setup] Creating 'docker' group with GID $SOCKET_GID"
-        groupadd -g "$SOCKET_GID" docker
+        if getent group docker > /dev/null 2>&1; then
+            DOCKER_ACCESS_GROUP="dockersock"
+            if getent group "$DOCKER_ACCESS_GROUP" > /dev/null 2>&1; then
+                DOCKER_ACCESS_GROUP="dockersock2"
+            fi
+        else
+            DOCKER_ACCESS_GROUP="docker"
+        fi
+
+        echo "[Setup] Creating '$DOCKER_ACCESS_GROUP' group with GID $SOCKET_GID"
+        groupadd -g "$SOCKET_GID" "$DOCKER_ACCESS_GROUP"
     fi
 
-    if ! id -nG coder | grep -qw docker; then
-        echo "[Setup] Adding 'coder' to 'docker' group"
-        usermod -aG docker coder
+    echo "[Setup] Docker socket group: '$DOCKER_ACCESS_GROUP' (GID $SOCKET_GID)"
+    if ! id -nG coder | grep -qw "$DOCKER_ACCESS_GROUP"; then
+        echo "[Setup] Adding 'coder' to '$DOCKER_ACCESS_GROUP' group"
+        usermod -aG "$DOCKER_ACCESS_GROUP" coder
     fi
 else
     echo "[Warning] Docker socket not found at $SOCKET"
