@@ -32,10 +32,22 @@ if [ "$(stat -c '%u' /home/coder)" != "$TARGET_UID" ]; then
     chown -R coder:coder /home/coder
 fi
 
-# Fix workspace ownership
-if [ -d /workspace ] && [ "$(stat -c '%u' /workspace)" != "$TARGET_UID" ]; then
+# --- Workspace Directory ---
+# If /workspace doesn't exist or is empty (Docker auto-created it), ensure proper setup
+if [ ! -d /workspace ]; then
+    echo "[Setup] Creating /workspace directory..."
+    mkdir -p /workspace
+fi
+
+# Fix workspace ownership if needed
+if [ "$(stat -c '%u' /workspace)" != "$TARGET_UID" ]; then
     echo "[Setup] Fixing /workspace ownership..."
     chown coder:coder /workspace
+fi
+
+# Friendly warning if workspace is empty
+if [ -z "$(ls -A /workspace 2>/dev/null)" ]; then
+    echo "[Info] /workspace is empty. Mount your code directory or create projects here."
 fi
 
 # --- 2. Docker Socket Access ---
