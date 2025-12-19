@@ -19,6 +19,8 @@ RUN apt-get update && apt-get install -y \
     lsb-release \
     gosu \
     tzdata \
+    jq \
+    htop \
     && rm -rf /var/lib/apt/lists/*
 
 # Install VS Code CLI (with ARM64 support)
@@ -32,6 +34,16 @@ RUN ARCH=$([ "$TARGETARCH" = "arm64" ] && echo "cli-linux-arm64" || echo "cli-li
 # Create a non-root user "coder" (will be remapped at runtime)
 RUN useradd -m -s /bin/bash -u 1000 -U coder && \
     echo "coder ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+
+# Pre-install common VS Code extensions (run as coder to set correct ownership)
+# These will be available immediately when connecting
+USER coder
+RUN code --install-extension ms-azuretools.vscode-docker \
+    && code --install-extension eamodio.gitlens \
+    && code --install-extension esbenp.prettier-vscode \
+    && code --install-extension dbaeumer.vscode-eslint \
+    || true
+USER root
 
 # Set up the entrypoint script
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
