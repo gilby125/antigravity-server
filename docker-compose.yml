@@ -26,6 +26,10 @@ services:
 
     environment:
       - VSCODE_CLI_USE_FILE_KEYRING=1
+      # IMPORTANT: Set these to your host user's UID/GID (run `id -u` and `id -g`)
+      # This ensures files created inside the container are owned by YOU.
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-1000}
 
     # The name you want to see when connecting via Remote - Tunnels
     command: code tunnel --accept-server-license-terms --name antigravity-server

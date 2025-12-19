@@ -5,7 +5,7 @@ A bulletproof, Dockerized setup for running VS Code Server (Remote Tunnels). Thi
 ## Features
 - **Docker-in-Docker Control**: Full access to the host's Docker daemon.
 - **Persistence**: Extensions, settings, and authentication survive container restarts.
-- **Permissions Handling**: Automatically maps user permissions to the host's Docker socket.
+- **Dynamic Permissions**: Automatically maps the container user (`coder`) to your host user's UID/GID. No more `root` owned files cluttering your workspace!
 - **Secure**: Uses VS Code Remote Tunnels (GitHub Authentication).
 
 ## Prerequisites
@@ -19,12 +19,19 @@ A bulletproof, Dockerized setup for running VS Code Server (Remote Tunnels). Thi
     cd antigravity-server
     ```
 
-2.  **Start the server**:
+2.  **Configure Permissions (Optional but Recommended)**:
+    By default, it uses UID/GID 1000. If your user ID is different (run `id -u`), set it in a `.env` file or export it:
+    ```bash
+    export PUID=$(id -u)
+    export PGID=$(id -g)
+    ```
+
+3.  **Start the server**:
     ```bash
     docker compose up -d
     ```
 
-3.  **Authenticate**:
+4.  **Authenticate**:
     The first time you run this, you need to link it to your GitHub account.
     View the logs to get the login code:
     ```bash
