@@ -1,0 +1,35 @@
+services:
+  antigravity:
+    image: antigravity-server:latest
+    build: .
+    container_name: antigravity_server
+    restart: unless-stopped
+    volumes:
+      # Map the user's code to /workspace in the container
+      # Adjust '~/code' to your actual code directory if different
+      - ${HOME}/code:/workspace:cached
+
+      # Persistence for VS Code (auth, extensions, settings)
+      - vscode_data:/home/coder/.vscode-cli
+
+      # Persistence for the container user's home (shell history, etc.)
+      - home_data:/home/coder
+
+      # Docker control - mapped from host
+      - /var/run/docker.sock:/var/run/docker.sock
+
+    # Increase shared memory size (helpful for some tools/browsers)
+    shm_size: 2gb
+
+    # Ensure correct network access
+    network_mode: host
+
+    environment:
+      - VSCODE_CLI_USE_FILE_KEYRING=1
+
+    # The name you want to see when connecting via Remote - Tunnels
+    command: code tunnel --accept-server-license-terms --name antigravity-server
+
+volumes:
+  vscode_data:
+  home_data:
