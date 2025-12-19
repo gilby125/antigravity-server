@@ -5,34 +5,49 @@ services:
     container_name: antigravity_server
     restart: unless-stopped
     volumes:
-      # Map the user's code to /workspace in the container
-      # Adjust '~/code' to your actual code directory if different
-      - ${HOME}/code:/workspace:cached
+      # IMPORTANT: Mount order matters! Broader mounts first.
 
-      # Persistence for VS Code (auth, extensions, settings)
+      # Persistence for the container user's home (shell history, ssh keys, etc.)
+      - home_data:/home/coder
+
+      # Persistence for VS Code (auth, extensions, settings) - inside home
       - vscode_data:/home/coder/.vscode-cli
 
-      # Persistence for the container user's home (shell history, etc.)
-      - home_data:/home/coder
+      # Map the user's code to /workspace in the container
+      - ${CODE_DIR:-${HOME}/code}:/workspace:cached
 
       # Docker control - mapped from host
       - /var/run/docker.sock:/var/run/docker.sock
 
+      # SSH Agent forwarding (optional, comment out if not using)
+      - ${SSH_AUTH_SOCK:-/dev/null}:/ssh-agent:ro
+
     # Increase shared memory size (helpful for some tools/browsers)
     shm_size: 2gb
 
-    # Ensure correct network access
+    # Use host network for easy access to host services
     network_mode: host
 
     environment:
       - VSCODE_CLI_USE_FILE_KEYRING=1
-      # IMPORTANT: Set these to your host user's UID/GID (run `id -u` and `id -g`)
-      # This ensures files created inside the container are owned by YOU.
+      # Map container user to your host user (run `id -u` and `id -g`)
       - PUID=${PUID:-1000}
       - PGID=${PGID:-1000}
+      # Timezone (e.g., America/Chicago, Europe/London)
+      - TZ=${TZ:-UTC}
+      # SSH Agent socket path inside container
+      - SSH_AUTH_SOCK=/ssh-agent
+
+    # Healthcheck: verify the tunnel process is running
+    healthcheck:
+      test: [ "CMD", "pgrep", "-f", "code tunnel" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
 
     # The name you want to see when connecting via Remote - Tunnels
-    command: code tunnel --accept-server-license-terms --name antigravity-server
+    command: code tunnel --accept-server-license-terms --name ${TUNNEL_NAME:-antigravity-server}
 
 volumes:
   vscode_data:
